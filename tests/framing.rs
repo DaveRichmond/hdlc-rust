@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use hdlc::{decode, decode_slice, encode, HDLCError, SpecialChars};
+    use std::io::Cursor;
+
+    use hdlc::{decode, decode_slice, encode, get_frames, FrameReader, HDLCError, SpecialChars};
 
     #[test]
     fn packetizes() {
@@ -291,5 +293,225 @@ mod tests {
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), HDLCError::MissingFinalFend)
+    }
+
+    #[test]
+    fn get_single_frame() {
+        let chars = SpecialChars::default();
+        let msg = [chars.fend, 0x01, 0x00, 0x05, 0x80, chars.fend];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0], vec![126, 1, 0, 5, 128, 126]);
+    }
+
+    #[test]
+    fn get_single_frame_and_rest() {
+        let chars = SpecialChars::default();
+        let msg = [
+            chars.fend, 0x01, 0x00, 0x05, 0x80, chars.fend, 0x30, 0x10, 0x22,
+        ];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0], vec![126, 1, 0, 5, 128, 126]);
+    }
+
+    #[test]
+    fn get_single_frame_invalid_prefix() {
+        let chars = SpecialChars::default();
+        let msg = [
+            0x1, 0x2, 0x3, chars.fend, 0x01, 0x00, 0x05, 0x80, chars.fend,
+        ];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0], vec![126, 1, 0, 5, 128, 126]);
+    }
+
+    #[test]
+    fn get_single_frame_with_package_end() {
+        let chars = SpecialChars::default();
+        let msg = [
+            chars.fend, chars.fend, 0x53, 0x30, 0x10, 0x22, chars.fend, 0x51, 0x52,
+        ];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0], vec![126, 83, 48, 16, 34, 126]);
+    }
+
+    #[test]
+    fn get_single_frame_with_package_end_as_prefix() {
+        let chars = SpecialChars::default();
+        let msg = [
+            0x01, 0x50, chars.fend, chars.fend, 0x51, 0x53, 0x30, 0x10, 0x22, chars.fend,
+        ];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0], vec![126, 81, 83, 48, 16, 34, 126]);
+    }
+
+    #[test]
+    fn get_multiple_frames() {
+        let chars = SpecialChars::default();
+        let msg = [
+            chars.fend, 0x01, 0x00, 0x05, 0x80, chars.fend, chars.fend, 0x02, 0x00, 0x05, 0x80,
+            chars.fend, chars.fend, 0x03, 0x00, 0x05, 0x80, chars.fend,
+        ];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        assert_eq!(frames.len(), 3);
+        assert_eq!(frames[0], vec![126, 1, 0, 5, 128, 126]);
+        assert_eq!(frames[1], vec![126, 2, 0, 5, 128, 126]);
+        assert_eq!(frames[2], vec![126, 3, 0, 5, 128, 126]);
+    }
+
+    #[test]
+    fn get_frames_no_data() {
+        let chars = SpecialChars::default();
+        let msg = [];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        assert_eq!(frames.len(), 0);
+    }
+
+    #[test]
+    fn only_rest() {
+        let chars = SpecialChars::default();
+        let msg = [0x05, 0x80, chars.fend, 0x1];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        assert_eq!(frames.len(), 0);
+    }
+
+    #[test]
+    fn get_frames_no_special_char() {
+        let chars = SpecialChars::default();
+        let msg = [0x05, 0x80, 0x1];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        assert_eq!(frames.len(), 0);
+    }
+
+    #[test]
+    fn only_frame_start() {
+        let chars = SpecialChars::default();
+        let msg = [0x05, 0x80, 0x1, chars.fend, chars.fend];
+        let mut frames: Vec<Vec<u8>> = vec![];
+        let mut reader = Cursor::new(msg);
+        let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+        loop {
+            match hdlc_reader.read_frame() {
+                Some(data) => {
+                    frames.push(data);
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        assert_eq!(frames.len(), 0);
     }
 }
