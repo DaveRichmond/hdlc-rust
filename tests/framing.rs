@@ -2,7 +2,7 @@
 mod tests {
     use std::io::Cursor;
 
-    use hdlc::{decode, decode_slice, encode, get_frames, FrameReader, HDLCError, SpecialChars};
+    use hdlc::{decode, decode_slice, encode, FrameReader, HDLCError, SpecialChars};
 
     #[test]
     fn packetizes() {

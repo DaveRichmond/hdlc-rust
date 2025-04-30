@@ -1,5 +1,5 @@
 //! # hdlc
-//! Only frames the data.  Rust implementation of a High-level Data Link Control (HDLC)
+//! Frames the data or parses a frame.  Rust implementation of a High-level Data Link Control (HDLC)
 //! library with support of the IEEE standard.
 //!
 //! ## Usage
@@ -69,7 +69,7 @@ use thiserror::Error;
 
 use std::collections::HashSet;
 use std::default::Default;
-use std::io::{Error, Read};
+use std::io::Read;
 
 /// Special Character structure for holding the encode and decode values.
 /// IEEE standard values are defined below in Default.
@@ -397,7 +397,6 @@ pub fn decode_slice(input: &mut [u8], s_chars: SpecialChars) -> Result<&[u8], HD
 /// assert_eq!(frames.len(), 2);
 /// assert_eq!(frames[0], vec![0x7E, 0x01, 0x50, 0x00, 0x01, 0x7E]);
 /// assert_eq!(frames[1], vec![0x7E, 0x11, 0x12, 0x13, 0x14, 0x7E]);
-/// ```
 ///
 pub struct FrameReader<'a> {
     /// Data source, can be any source that implements the std::io::Read trait
@@ -425,7 +424,7 @@ impl<'a> FrameReader<'a> {
     }
 }
 
-impl<'a> FrameReader<'a> {
+impl FrameReader<'_> {
     /// Reads a frame from the reader.
     ///
     /// The first bytes until the start of a frame are ignored.
@@ -434,11 +433,8 @@ impl<'a> FrameReader<'a> {
     /// * `Option<Vec<u8>>` - The frame read from the reader, or None if no more frames are available.
     pub fn read_frame(&mut self) -> Option<Vec<u8>> {
         let mut buffer = vec![0; 1024];
-        let bytes_read = match self.reader.read(&mut buffer).ok() {
-            Some(bytes) => bytes,
-            None => 0,
-        };
-        if bytes_read == 0 && self.rest.len() == 0 {
+        let bytes_read = self.reader.read(&mut buffer).ok().unwrap_or_default();
+        if bytes_read == 0 && self.rest.is_empty() {
             // No more data to read
             return None;
         }
@@ -492,7 +488,7 @@ impl<'a> FrameReader<'a> {
     }
 }
 
-impl<'a> Iterator for FrameReader<'a> {
+impl Iterator for FrameReader<'_> {
     type Item = Vec<u8>;
 
     fn next(&mut self) -> Option<Self::Item> {

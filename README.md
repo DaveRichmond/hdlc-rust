@@ -8,7 +8,7 @@
 
 ## HDLC Framing Description
 
-> Only frames the data.  Rust implementation of a High-level Data Link Control (HDLC) library with support of the IEEE standard.
+> Frames the data or parses a frame.  Rust implementation of a High-level Data Link Control (HDLC) library with support of the IEEE standard.
 
 * [Crate](https://crates.io/crates/hdlc)
 * [Documentation](https://docs.rs/hdlc/)
