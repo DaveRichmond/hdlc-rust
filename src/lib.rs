@@ -118,12 +118,12 @@ impl SpecialChars {
 /// Produces escaped (encoded) message surrounded with `FEND`
 ///
 /// # Inputs
-/// * **Vec<u8>**: A vector of the bytes you want to encode
+/// * **`Vec<u8>`**: A vector of the bytes you want to encode
 /// * **SpecialChars**: The special characters you want to swap
 ///
 /// # Output
 ///
-/// * **Result<Vec<u8>>**: Encoded output message
+/// * **`Result<Vec<u8>>`**: Encoded output message
 ///
 /// # Error
 ///
@@ -185,12 +185,12 @@ pub fn encode(data: &[u8], s_chars: SpecialChars) -> Result<Vec<u8>, HDLCError> 
 /// Produces unescaped (decoded) message without `FEND` characters.
 ///
 /// # Inputs
-/// * **Vec<u8>**: A vector of the bytes you want to decode
+/// * **`Vec<u8>`**: A vector of the bytes you want to decode
 /// * **SpecialChars**: The special characters you want to swap
 ///
 /// # Output
 ///
-/// * **Result<Vec<u8>>**: Decoded output message
+/// * **`Result<Vec<u8>>`**: Decoded output message
 ///
 /// # Error
 ///
