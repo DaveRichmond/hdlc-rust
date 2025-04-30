@@ -1,7 +1,7 @@
 [package]
 name = "hdlc"
 edition = "2021"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Christopher Lomanno <Lomannoc@gmail.com>", "Oskar Østby <oskar@oestby.io>"]
 description = "Rust implementation of HDLC with support of the IEEE standard"
 keywords = ["hdlc", "frame", "framing", "byte-swap", "packetize"]

@@ -69,6 +69,7 @@ use thiserror::Error;
 
 use std::collections::HashSet;
 use std::default::Default;
+use std::io::{Error, Read};
 
 /// Special Character structure for holding the encode and decode values.
 /// IEEE standard values are defined below in Default.
@@ -357,6 +358,146 @@ pub fn decode_slice(input: &mut [u8], s_chars: SpecialChars) -> Result<&[u8], HD
     }
 
     Err(HDLCError::MissingFinalFend)
+}
+
+/// A struct representing a reader for HDLC frames.
+/// It reads data from a source that implements the `std::io::Read` trait.
+/// The reader can be used to read frames from a stream of bytes.
+/// It will ignore the first bytes until the start of a frame.
+///
+/// /// # Fields
+/// * `reader`: A mutable reference to a reader that implements the `std::io::Read` trait.
+/// * `s_char`: The special characters used for HDLC encoding.
+/// * `rest`: A vector to store the remaining bytes after reading a frame.
+///
+/// # Example
+/// ```rust
+/// use hdlc::SpecialChars;
+/// use std::io::Cursor;
+/// use std::io::Read;
+/// use hdlc::FrameReader;
+///
+/// let chars = SpecialChars::default();
+/// let data: Vec<u8> = vec![ 0x7E, 0x01, 0x50, 0x00, 0x01, 0x7E, 0x7E, 0x11, 0x12, 0x13, 0x14, 0x7E];
+/// let mut frames: Vec<Vec<u8>> = vec![];
+/// let mut reader = Cursor::new(data);
+/// let mut hdlc_reader = FrameReader::new(&mut reader, chars);
+/// loop {
+///     match hdlc_reader.read_frame() {
+///        Some(data) => {
+///           frames.push(data);
+///          println!("got a frame {:?}", frames.last());
+///       }
+///       None => {
+///         println!("No frame");
+///          break;
+///      }
+///   }
+/// }
+/// assert_eq!(frames.len(), 2);
+/// assert_eq!(frames[0], vec![0x7E, 0x01, 0x50, 0x00, 0x01, 0x7E]);
+/// assert_eq!(frames[1], vec![0x7E, 0x11, 0x12, 0x13, 0x14, 0x7E]);
+/// ```
+///
+pub struct FrameReader<'a> {
+    /// Data source, can be any source that implements the std::io::Read trait
+    reader: &'a mut dyn Read,
+
+    /// List of HDLC special chars
+    s_char: SpecialChars,
+
+    /// The rest of received data
+    rest: Vec<u8>,
+}
+
+impl<'a> FrameReader<'a> {
+    /// Creates a new FrameReader instance.
+    ///
+    /// # Arguments
+    /// * `reader` - A mutable reference to a reader that implements the `std::io::Read` trait.
+    /// * `s_char` - The special characters used for HDLC encoding.
+    pub fn new(reader: &'a mut dyn Read, s_char: SpecialChars) -> Self {
+        Self {
+            reader,
+            s_char,
+            rest: Vec::new(),
+        }
+    }
+}
+
+impl<'a> FrameReader<'a> {
+    /// Reads a frame from the reader.
+    ///
+    /// The first bytes until the start of a frame are ignored.
+    ///
+    /// # Returns
+    /// * `Option<Vec<u8>>` - The frame read from the reader, or None if no more frames are available.
+    pub fn read_frame(&mut self) -> Option<Vec<u8>> {
+        let mut buffer = vec![0; 1024];
+        let bytes_read = match self.reader.read(&mut buffer).ok() {
+            Some(bytes) => bytes,
+            None => 0,
+        };
+        if bytes_read == 0 && self.rest.len() == 0 {
+            // No more data to read
+            return None;
+        }
+
+        // Merge the rest with the new data
+        let mut data = self.rest.clone();
+        if bytes_read > 0 {
+            data.extend_from_slice(&buffer[..bytes_read]);
+        }
+
+        // Detect frame starting and ending with FEND
+        let mut in_frame = false;
+        let mut full_frame = false;
+        let mut frame: Vec<u8> = Vec::new();
+        let mut bytes_checked = 0;
+        for byte in data.iter() {
+            bytes_checked += 1;
+            if *byte == self.s_char.fend {
+                frame.push(*byte);
+
+                // End of a frame
+                if in_frame {
+                    self.rest.clear();
+                    full_frame = true;
+                    break;
+                } else {
+                    // If the next byte is also a fend byte, skip it
+                    if let Some(next_byte) = data.get(frame.len()) {
+                        if *next_byte == self.s_char.fend {
+                            continue;
+                        }
+                    }
+                    // The old bytes except of FEND should be removed
+                    frame.drain(..frame.len().saturating_sub(1));
+                    in_frame = true;
+                }
+            } else {
+                frame.push(*byte);
+            }
+        }
+
+        // Save the rest of the data for the next read
+        self.rest.extend_from_slice(&data[bytes_checked..]);
+
+        // If a frame is started and ended with FEND, return it, else its invalid
+        if full_frame {
+            Some(frame)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> Iterator for FrameReader<'a> {
+    type Item = Vec<u8>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.read_frame()
+    }
 }
 
 #[derive(Debug, Error, PartialEq)]
