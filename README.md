@@ -21,7 +21,7 @@ Add `hdlc` to `Cargo.toml`
 
 ```toml
 [dependencies]
-hdlc = "^0.3.0"
+hdlc = "^0.4.0"
 ```
 
 or
