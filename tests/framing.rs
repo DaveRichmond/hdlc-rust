@@ -2,7 +2,10 @@
 mod tests {
     use std::io::Cursor;
 
-    use hdlc::{decode, decode_slice, encode, FrameReader, HDLCError, SpecialChars};
+    use hdlc::{
+        decode, decode_slice, encode, FrameReader, HDLCError, SpecialChars, FEND, FESC, TFEND,
+        TFESC,
+    };
 
     #[test]
     fn packetizes() {
@@ -69,18 +72,7 @@ mod tests {
     fn depack_it_swaps() {
         let chars = SpecialChars::default();
         let msg: Vec<u8> = vec![
-            chars.fend,
-            0x01,
-            chars.fesc,
-            chars.tfesc,
-            0x00,
-            0x00,
-            chars.fesc,
-            chars.tfend,
-            0x05,
-            0x80,
-            0x09,
-            chars.fend,
+            FEND, 0x01, FESC, TFESC, 0x00, 0x00, FESC, TFEND, 0x05, 0x80, 0x09, FEND,
         ];
         let cmp: Vec<u8> = vec![1, 125, 0, 0, 126, 5, 128, 9];
 
@@ -94,18 +86,7 @@ mod tests {
     fn depack_custom_s_chars() {
         let chars = SpecialChars::new(0x71, 0x70, 0x51, 0x50);
         let msg: Vec<u8> = vec![
-            chars.fend,
-            0x01,
-            0x7E,
-            chars.fesc,
-            chars.tfend,
-            0x00,
-            0x05,
-            0x80,
-            chars.fesc,
-            chars.tfesc,
-            0x09,
-            0x71,
+            0x71, 0x01, 0x7E, 0x70, 0x51, 0x00, 0x05, 0x80, 0x70, 0x50, 0x09, 0x71,
         ];
         let cmp: Vec<u8> = vec![1, 126, 0x71, 0, 5, 128, 0x70, 9];
 
@@ -118,7 +99,7 @@ mod tests {
     #[test]
     fn depack_rejects_dupe_s_chars() {
         let chars = SpecialChars::new(0x7E, 0x7D, 0x5D, 0x5D);
-        let msg: Vec<u8> = vec![0x01, chars.fend, 0x00, chars.fesc, 0x00, 0x05, 0x80, 0x09];
+        let msg: Vec<u8> = vec![0x01, 0x7E, 0x00, 0x7D, 0x00, 0x05, 0x80, 0x09];
 
         let result = decode(&msg, chars);
 
@@ -130,7 +111,7 @@ mod tests {
     fn depack_rejects_stray_fend_char() {
         let chars = SpecialChars::default();
         let msg: Vec<u8> = vec![
-            chars.fend, 0x01, 0x00, 0x69, 0x00, 0x05, 0x80, 0x09, chars.fend, chars.fend,
+            chars.fend, 0x01, 0x00, 0x69, 0x00, 0x05, 0x80, 0x09, FEND, FEND,
         ];
 
         let result = decode(&msg, chars);
@@ -142,9 +123,7 @@ mod tests {
     #[test]
     fn depack_rejects_stray_fesc_char() {
         let chars = SpecialChars::default();
-        let msg: Vec<u8> = vec![
-            chars.fend, 0x01, chars.fesc, 0x00, chars.fesc, 0x00, 0x05, 0x80, 0x09, chars.fend,
-        ];
+        let msg: Vec<u8> = vec![FEND, 0x01, FESC, 0x00, FESC, 0x00, 0x05, 0x80, 0x09, FEND];
 
         let result = decode(&msg, chars);
 
@@ -155,17 +134,7 @@ mod tests {
     #[test]
     fn depack_rejects_incomplete_message() {
         let chars = SpecialChars::default();
-        let msg: Vec<u8> = vec![
-            chars.fend,
-            0x01,
-            chars.fesc,
-            chars.tfesc,
-            0x77,
-            0x00,
-            0x05,
-            0x80,
-            0x09,
-        ];
+        let msg: Vec<u8> = vec![FEND, 0x01, FESC, TFESC, 0x77, 0x00, 0x05, 0x80, 0x09];
 
         let result = decode(&msg, chars);
 
@@ -176,9 +145,7 @@ mod tests {
     #[test]
     fn depacketizes_slice() {
         let chars = SpecialChars::default();
-        let mut msg = [
-            chars.fend, 0x01, 0x50, 0x00, 0x00, 0x00, 0x05, 0x80, 0x09, chars.fend,
-        ];
+        let mut msg = [FEND, 0x01, 0x50, 0x00, 0x00, 0x00, 0x05, 0x80, 0x09, FEND];
         let cmp = [1, 80, 0, 0, 0, 5, 128, 9];
 
         let result = decode_slice(&mut msg, chars);
@@ -191,18 +158,7 @@ mod tests {
     fn depack_slice_it_swaps() {
         let chars = SpecialChars::default();
         let mut msg = [
-            chars.fend,
-            0x01,
-            chars.fesc,
-            chars.tfesc,
-            0x00,
-            0x00,
-            chars.fesc,
-            chars.tfend,
-            0x05,
-            0x80,
-            0x09,
-            chars.fend,
+            FEND, 0x01, FESC, FESC, 0x00, 0x00, FESC, TFEND, 0x05, 0x80, 0x09, FEND,
         ];
         let cmp = [1, 125, 0, 0, 126, 5, 128, 9];
 
@@ -216,18 +172,7 @@ mod tests {
     fn depack_slice_custom_s_chars() {
         let chars = SpecialChars::new(0x71, 0x70, 0x51, 0x50);
         let mut msg = [
-            chars.fend,
-            0x01,
-            0x7E,
-            chars.fesc,
-            chars.tfend,
-            0x00,
-            0x05,
-            0x80,
-            chars.fesc,
-            chars.tfesc,
-            0x09,
-            0x71,
+            0x71, 0x01, 0x7E, 0x71, 0x51, 0x00, 0x05, 0x80, 0x70, 0x50, 0x09, 0x71,
         ];
         let cmp = [1, 126, 0x71, 0, 5, 128, 0x70, 9];
 
@@ -240,7 +185,7 @@ mod tests {
     #[test]
     fn depack_slice_rejects_dupe_s_chars() {
         let chars = SpecialChars::new(0x7E, 0x7D, 0x5D, 0x5D);
-        let mut msg = [0x01, chars.fend, 0x00, chars.fesc, 0x00, 0x05, 0x80, 0x09];
+        let mut msg = [0x01, 0x7E, 0x00, 0x7D, 0x00, 0x05, 0x80, 0x09];
 
         let result = decode_slice(&mut msg, chars);
 
@@ -252,7 +197,7 @@ mod tests {
     fn depack_slice_rejects_stray_fend_char() {
         let chars = SpecialChars::default();
         let mut msg = [
-            chars.fend, 0x01, 0x00, 0x69, 0x00, 0x05, 0x80, 0x09, chars.fend, chars.fend,
+            chars.fend, 0x01, 0x00, 0x69, 0x00, 0x05, 0x80, 0x09, FEND, FEND,
         ];
 
         let result = decode_slice(&mut msg, chars);
@@ -264,9 +209,7 @@ mod tests {
     #[test]
     fn depack_slice_rejects_stray_fesc_char() {
         let chars = SpecialChars::default();
-        let mut msg = [
-            chars.fend, 0x01, chars.fesc, 0x00, chars.fesc, 0x00, 0x05, 0x80, 0x09, chars.fend,
-        ];
+        let mut msg = [FEND, 0x01, FESC, 0x00, FESC, 0x00, 0x05, 0x80, 0x09, FEND];
 
         let result = decode_slice(&mut msg, chars);
 
@@ -277,17 +220,7 @@ mod tests {
     #[test]
     fn depack_slice_rejects_incomplete_message() {
         let chars = SpecialChars::default();
-        let mut msg = [
-            chars.fend,
-            0x01,
-            chars.fesc,
-            chars.tfesc,
-            0x77,
-            0x00,
-            0x05,
-            0x80,
-            0x09,
-        ];
+        let mut msg = [FEND, 0x01, FESC, TFESC, 0x77, 0x00, 0x05, 0x80, 0x09];
 
         let result = decode_slice(&mut msg, chars);
 
@@ -298,7 +231,7 @@ mod tests {
     #[test]
     fn get_single_frame() {
         let chars = SpecialChars::default();
-        let msg = [chars.fend, 0x01, 0x00, 0x05, 0x80, chars.fend];
+        let msg = [FEND, 0x01, 0x00, 0x05, 0x80, FEND];
         let mut frames: Vec<Vec<u8>> = vec![];
         let mut reader = Cursor::new(msg);
         let mut hdlc_reader = FrameReader::new(&mut reader, chars);
@@ -320,9 +253,7 @@ mod tests {
     #[test]
     fn get_single_frame_and_rest() {
         let chars = SpecialChars::default();
-        let msg = [
-            chars.fend, 0x01, 0x00, 0x05, 0x80, chars.fend, 0x30, 0x10, 0x22,
-        ];
+        let msg = [FEND, 0x01, 0x00, 0x05, 0x80, FEND, 0x30, 0x10, 0x22];
         let mut frames: Vec<Vec<u8>> = vec![];
         let mut reader = Cursor::new(msg);
         let mut hdlc_reader = FrameReader::new(&mut reader, chars);
@@ -343,9 +274,7 @@ mod tests {
     #[test]
     fn get_single_frame_invalid_prefix() {
         let chars = SpecialChars::default();
-        let msg = [
-            0x1, 0x2, 0x3, chars.fend, 0x01, 0x00, 0x05, 0x80, chars.fend,
-        ];
+        let msg = [0x1, 0x2, 0x3, FEND, 0x01, 0x00, 0x05, 0x80, FEND];
         let mut frames: Vec<Vec<u8>> = vec![];
         let mut reader = Cursor::new(msg);
         let mut hdlc_reader = FrameReader::new(&mut reader, chars);
@@ -366,9 +295,7 @@ mod tests {
     #[test]
     fn get_single_frame_with_package_end() {
         let chars = SpecialChars::default();
-        let msg = [
-            chars.fend, chars.fend, 0x53, 0x30, 0x10, 0x22, chars.fend, 0x51, 0x52,
-        ];
+        let msg = [FEND, FEND, 0x53, 0x30, 0x10, 0x22, FEND, 0x51, 0x52];
         let mut frames: Vec<Vec<u8>> = vec![];
         let mut reader = Cursor::new(msg);
         let mut hdlc_reader = FrameReader::new(&mut reader, chars);
@@ -389,9 +316,7 @@ mod tests {
     #[test]
     fn get_single_frame_with_package_end_as_prefix() {
         let chars = SpecialChars::default();
-        let msg = [
-            0x01, 0x50, chars.fend, chars.fend, 0x51, 0x53, 0x30, 0x10, 0x22, chars.fend,
-        ];
+        let msg = [0x01, 0x50, FEND, FEND, 0x51, 0x53, 0x30, 0x10, 0x22, FEND];
         let mut frames: Vec<Vec<u8>> = vec![];
         let mut reader = Cursor::new(msg);
         let mut hdlc_reader = FrameReader::new(&mut reader, chars);
@@ -413,8 +338,8 @@ mod tests {
     fn get_multiple_frames() {
         let chars = SpecialChars::default();
         let msg = [
-            chars.fend, 0x01, 0x00, 0x05, 0x80, chars.fend, chars.fend, 0x02, 0x00, 0x05, 0x80,
-            chars.fend, chars.fend, 0x03, 0x00, 0x05, 0x80, chars.fend,
+            FEND, 0x01, 0x00, 0x05, 0x80, FEND, FEND, 0x02, 0x00, 0x05, 0x80, FEND, FEND, 0x03,
+            0x00, 0x05, 0x80, FEND,
         ];
         let mut frames: Vec<Vec<u8>> = vec![];
         let mut reader = Cursor::new(msg);
@@ -458,7 +383,7 @@ mod tests {
     #[test]
     fn only_rest() {
         let chars = SpecialChars::default();
-        let msg = [0x05, 0x80, chars.fend, 0x1];
+        let msg = [0x05, 0x80, FEND, 0x1];
         let mut frames: Vec<Vec<u8>> = vec![];
         let mut reader = Cursor::new(msg);
         let mut hdlc_reader = FrameReader::new(&mut reader, chars);
@@ -498,7 +423,7 @@ mod tests {
     #[test]
     fn only_frame_start() {
         let chars = SpecialChars::default();
-        let msg = [0x05, 0x80, 0x1, chars.fend, chars.fend];
+        let msg = [0x05, 0x80, 0x1, FEND, FEND];
         let mut frames: Vec<Vec<u8>> = vec![];
         let mut reader = Cursor::new(msg);
         let mut hdlc_reader = FrameReader::new(&mut reader, chars);
