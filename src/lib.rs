@@ -124,6 +124,19 @@ impl SpecialChars {
         }
     }
 
+    /// Creates a SpecialChars structure for encoding/decoding a packet, but with custom byte translations
+    pub fn new_custom(fend: u8, fesc: u8, translations: HashMap<u8, u8>) -> SpecialChars {
+        // println!(
+        //     "Creating specialchars with custom translation: {:#?}",
+        //     translations
+        // );
+        SpecialChars {
+            fend,
+            fesc,
+            translate: translations,
+        }
+    }
+
     /// Takes the translation map and reverses the key:value pairs so we can decode them
     pub fn decodes(&self) -> HashMap<u8, u8> {
         let mut t = HashMap::new();
@@ -256,6 +269,8 @@ pub fn decode(input: &[u8], s_chars: SpecialChars) -> Result<Vec<u8>, HDLCError>
     }
 
     let d = s_chars.decodes();
+    // println!("Encode map: {:#?}", s_chars.translate);
+    // println!("Decode map: {:#?}", d);
 
     // Loop over every byte of the message
     while let Some(value) = input_iter.next() {
