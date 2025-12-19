@@ -67,10 +67,25 @@
 
 use thiserror::Error;
 
-use std::collections::{HashMap, HashSet};
-use std::default::Default;
-use std::hash::Hash;
-use std::io::Read;
+use cfg_block::cfg_block;
+
+cfg_block! {
+    #[cfg(feature = "std")] {
+        use std::collections::{HashMap, HashSet};
+        use std::default::Default;
+        use std::hash::Hash;
+        use std::vec::Vec;
+        use std::io::Read;
+    }
+    #[cfg(feature="no_std")] {
+        extern crate alloc;
+        use hashbrown::collections::{HashMap, HashSet};
+        use core::default::Default;
+        use core::hash::Hash;
+        use alloc::vec::Vec;
+        use embedded_io::Read;
+    }
+}
 
 /// Default Frame Ending character
 pub const FEND: u8 = 0x7E;
@@ -334,6 +349,7 @@ pub fn decode(input: &[u8], s_chars: SpecialChars) -> Result<Vec<u8>, HDLCError>
 /// let mut input = [ 0x7E, 0x01, 0x50, 0x00, 0x00, 0x00, 0x05, 0x80, 0x09, 0x7E];
 /// let op_vec = hdlc::decode_slice(&mut input, chars);
 /// ```
+#[cfg(not(feature = "no_std"))] // FIXME this isn't implemented in a no-std env
 pub fn decode_slice(input: &mut [u8], s_chars: SpecialChars) -> Result<&[u8], HDLCError> {
     // Safety check to make sure the special character values are all unique
     if s_chars.fend == s_chars.fesc {
